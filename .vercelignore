@@ -1,0 +1,16 @@
+node_modules
+dist
+android
+ios
+.git
+.firebase
+.github
+.vscode
+.opencode
+.claude
+docs
+.vercel
+*.local
+firebase.json
+firestore.rules
+.capacitor

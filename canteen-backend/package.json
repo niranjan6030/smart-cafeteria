@@ -1,0 +1,13 @@
+{
+  "name": "canteen-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Christ Canteen payment/auth backend — deployed as a single @vercel/node function with bare-name routes (see root vercel.json).",
+  "main": "index.js",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "firebase-admin": "^13.8.0",
+    "razorpay": "^2.9.6"
+  }
+}

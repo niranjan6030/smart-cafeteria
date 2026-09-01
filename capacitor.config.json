@@ -1,0 +1,9 @@
+{
+  "appId": "com.christ.canteen",
+  "appName": "ChristCanteen",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

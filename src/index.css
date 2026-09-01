@@ -1,0 +1,427 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Brand fonts ─────────────────────────────────────────────────────────────
+   Google Fonts stand-ins for the Athelas + Vanguard pairing: Vanguard → Outfit
+   (geometric sans, all body/UI text), Athelas → Lora (editorial serif, headings).
+   Tempting Script — the elegant display accent — is self-hosted here (see
+   public/fonts/Tempting-LICENSE.txt; personal-use license from RGB Studio). It
+   is applied sparingly with the `font-script` utility, never as a body font. */
+@font-face {
+  font-family: 'Tempting';
+  src: url('/fonts/tempting.ttf') format('truetype'),
+       url('/fonts/tempting.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ─── Design tokens (spec §18) ────────────────────────────────────────────────
+   COZY CAFÉ & BAKERY — a food-first product identity, decoupled from the campus
+   palette. 60% warm cream background · 30% cocoa (typography + structural
+   surfaces) · 10% terracotta accent (add-to-cart, CTAs, active states, price
+   emphasis). Semantic CSS variables consumed across the app; the `dark` class on
+   <html> drives the dark variant (never a naive inversion). */
+:root {
+  --color-bg: #FDF8F5;
+  --color-bg-deep: #4A1D0A;
+  --color-surface: #FFFFFF;
+  --color-surface-elevated: #FFFFFF;
+  --color-primary: #E06A3B;
+  --color-primary-strong: #C9501F;
+  --color-accent: #4A3525;
+  --color-text: #4A3525;
+  --color-text-muted: #9C8574;
+  --color-text-secondary: #6B5A4C;
+  --color-border: #EEE2D8;
+  --color-border-strong: #E2D0C1;
+  --color-success: #2E9E6E;
+  --color-warning: #C98A1B;
+  --color-error: #D64545;
+  --color-danger: #D64545;
+  --color-feature-surface: #FFFFFF;
+  --color-feature-surface-2: #FBF3EC;
+  --color-feature-border: #EEE2D8;
+  --color-overlay: rgba(74, 53, 37, 0.45);
+  --color-footer-wash: rgba(224, 106, 59, 0.08);
+  --color-skeleton-from: rgba(74, 53, 37, 0.07);
+  --color-skeleton-to: rgba(74, 53, 37, 0.14);
+  --shadow-card: 0 1px 2px rgba(74, 53, 37, 0.05), 0 18px 45px -22px rgba(74, 53, 37, 0.22);
+}
+
+/* `.dark` may live on <html> (new toggles) or <body> (legacy kitchen toggle).
+   NIGHT identity — 60% matte black base, 30% graphite depth, 10% orange
+   accent. Deliberately not a naive inversion of the warm light theme. */
+html.dark, body.dark {
+  /* 60% matte black (spec §14) */
+  --color-bg: #0B0B0B;
+  --color-bg-deep: #050505;
+  --color-surface: #111111;
+  --color-surface-elevated: #1A1A1A;
+  /* 10% orange — the interaction/accent color (spec §14) */
+  --color-primary: #FF8A3C;
+  --color-primary-strong: #FFAE7A;
+  --color-accent: #FF8A3C;
+  --color-text: #F5F5F5;
+  --color-text-secondary: #B8B8B8;
+  --color-text-muted: #777777;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.14);
+  /* 30% graphite — large secondary surfaces, hero/feature gradients (spec §14-15) */
+  --color-feature-surface: #2B2B2B;
+  --color-feature-surface-2: #1D1D1D;
+  --color-feature-border: rgba(255, 138, 60, 0.18);
+  --color-success: #24C878;
+  --color-warning: #FFC53D;
+  --color-error: #FF4D4D;
+  --color-danger: #FF4D4D;
+  --color-footer-wash: rgba(255, 138, 60, 0.10);
+  --color-overlay: rgba(0, 0, 0, 0.75);
+  --color-skeleton-from: rgba(184, 184, 184, 0.12);
+  --color-skeleton-to: rgba(184, 184, 184, 0.22);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.45), 0 18px 45px -22px rgba(0, 0, 0, 0.7);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply antialiased;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: theme('fontFamily.sans');
+  }
+
+  h1, h2, h3, h4 {
+    font-family: theme('fontFamily.display');
+    letter-spacing: -0.02em;
+  }
+
+  /* Visible, consistent focus ring everywhere (spec §57) */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: var(--color-primary);
+    color: var(--color-bg-deep);
+  }
+
+  /* Restrained dark scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
+  *::-webkit-scrollbar { width: 8px; height: 8px; }
+  *::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 8px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+}
+
+@layer components {
+  /* ─── Buttons ─────────────────────────────────────────────────────────────── */
+  .cc-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full font-semibold transition;
+    font-size: 0.875rem;
+    line-height: 1;
+    padding: 0.875rem 1.5rem;
+    border: 1px solid transparent;
+    cursor: pointer;
+  }
+  .cc-btn:active { transform: scale(0.97); }
+  .cc-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+  .cc-btn-primary {
+    background: var(--color-primary);
+    color: var(--color-bg-deep);
+    font-weight: 800;
+    box-shadow: 0 10px 24px -12px rgba(224, 106, 59, 0.6);
+  }
+  .cc-btn-primary:hover { background: var(--color-primary-strong); }
+  /* Night mode: the primary CTA glow follows the 10% orange accent instead of the warm-terracotta
+     halo the light theme uses (spec §14). */
+  html.dark .cc-btn-primary, body.dark .cc-btn-primary {
+    box-shadow: 0 10px 24px -12px rgba(255, 138, 60, 0.35);
+  }
+
+  .cc-btn-outline { border-color: var(--color-border-strong); color: var(--color-text); background: transparent; }
+  .cc-btn-outline:hover { border-color: var(--color-primary); color: var(--color-primary-strong); }
+
+  .cc-btn-ghost { color: var(--color-text-muted); }
+  .cc-btn-ghost:hover { color: var(--color-text); background: color-mix(in srgb, var(--color-text-muted) 10%, transparent); }
+
+  /* ─── Inputs ──────────────────────────────────────────────────────────────── */
+  .cc-input {
+    width: 100%;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    color: var(--color-text);
+    padding: 0.9rem 1.25rem;
+    font-size: 0.925rem;
+    font-weight: 500;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .cc-input::placeholder { color: var(--color-text-muted); }
+  .cc-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(224, 106, 59, 0.22);
+  }
+  html.dark .cc-input:focus, body.dark .cc-input:focus {
+    box-shadow: 0 0 0 3px rgba(255, 138, 60, 0.25);
+  }
+
+  /* ─── Selectable chips / pills ────────────────────────────────────────────── */
+  .cc-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+    border-radius: 9999px;
+    padding: 0.6rem 1.15rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    background: transparent;
+    transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+    cursor: pointer;
+  }
+  .cc-chip:hover { border-color: var(--color-primary); color: var(--color-text); }
+  .cc-chip-active {
+    background: var(--color-primary);
+    border-color: transparent;
+    color: var(--color-bg-deep);
+    font-weight: 800;
+  }
+  .cc-chip-active:hover { color: var(--color-bg-deep); }
+
+  /* ─── Cards ───────────────────────────────────────────────────────────────── */
+  .cc-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    box-shadow: var(--shadow-card);
+  }
+  .cc-card-hover { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+  .cc-card-hover:hover { transform: translateY(-3px); border-color: var(--color-border-strong); }
+
+  /* Editorial section kicker (spec §28) */
+  .cc-kicker {
+    font-size: 0.6875rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.24em;
+    color: var(--color-primary-strong);
+  }
+  /* Night mode carries the 10% orange here — kickers are the accent color */
+  html.dark .cc-kicker, body.dark .cc-kicker { color: var(--color-accent); }
+
+  /* Shimmer skeleton block (spec §60) */
+  .cc-skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--color-skeleton-from) 25%,
+      var(--color-skeleton-to) 37%,
+      var(--color-skeleton-from) 63%
+    );
+    background-size: 800px 100%;
+    animation: ccShimmer 1.6s linear infinite;
+  }
+
+  .cc-muted { color: var(--color-text-muted); }
+
+  /* 30% dark-red feature environments — invisible in light mode,
+     re-skin promoted/featured panels in night mode (spec §14-15) */
+  .cc-feature-panel {
+    background: linear-gradient(120deg, #2E2016 0%, #4A3525 55%, #6B5240 100%);
+    color: #FDF8F5;
+  }
+  html.dark .cc-feature-panel, body.dark .cc-feature-panel {
+    background: linear-gradient(135deg, var(--color-feature-surface-2) 0%, var(--color-feature-surface) 78%);
+    color: var(--color-text);
+  }
+
+  .cc-feature-section {
+    position: relative;
+    overflow: hidden;
+    /* Inset in BOTH themes: the section is overflow:hidden with rounded corners, so a
+       flush-left kicker would let the corner radius clip the first letter (the "M" in
+       "Made for you"). The padding keeps editorial type clear of the clip. */
+    padding: 20px;
+  }
+  html.dark .cc-feature-section, body.dark .cc-feature-section {
+    background: var(--color-feature-surface-2);
+    border: 1px solid var(--color-feature-border);
+  }
+  @media (min-width: 640px) {
+    .cc-feature-section { padding: 28px; }
+  }
+
+
+  /* Footer / inline nav links */
+  .cc-link { color: var(--color-text-muted); transition: color 0.16s ease; }
+  .cc-link:hover { color: var(--color-primary-strong); }
+
+  .cc-hairline {
+    border: 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  /* Hide horizontal scrollbars on carousels without killing scrolling */
+  .cc-no-scrollbar::-webkit-scrollbar { display: none; }
+  .cc-no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .cc-snap-x { scroll-snap-type: x proximity; }
+  .cc-snap-start { scroll-snap-align: start; }
+
+  /* ─── Retained brand utilities (theme-aware) ─────────────────────────────── */
+  .cc-gold-gradient {
+    background: linear-gradient(135deg, #F6B48F 0%, var(--color-primary) 45%, #B24A1E 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 -1px 2px rgba(0, 0, 0, 0.08);
+  }
+  /* Night mode: the 10% orange gradient drives badges, active dots, hairlines */
+  html.dark .cc-gold-gradient, body.dark .cc-gold-gradient {
+    background: linear-gradient(135deg, #FFC9A1 0%, var(--color-primary) 50%, #C4501A 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 14px -6px rgba(255, 138, 60, 0.5);
+  }
+  .cc-card-shadow {
+    box-shadow: 0 18px 55px rgba(74, 53, 37, 0.12);
+    transition: box-shadow 0.35s ease, transform 0.35s ease;
+  }
+  .cc-card-shadow:hover { box-shadow: 0 24px 65px rgba(74, 53, 37, 0.18); }
+  .cc-food-overlay { background: linear-gradient(180deg, rgba(0,0,0,0) 10%, rgba(31,22,16,0.45) 48%, rgba(31,22,16,0.9) 100%); }
+  .cc-fade-in-up { animation: ccFadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+  .cc-tab-fade { animation: ccTabFade 0.32s ease-out; }
+  .cc-qty-roll-in { animation: ccQtyRollIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .cc-reveal-group .cc-fade-in-up, .cc-reveal-group.cc-fade-in-up { animation-play-state: paused; }
+  .cc-reveal-group.is-visible .cc-fade-in-up, .cc-reveal-group.is-visible.cc-fade-in-up { animation-play-state: running; }
+}
+
+@keyframes ccTabFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes ccQtyRollIn { from { opacity: 0; transform: translateY(6px) scale(0.7); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes ccShimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+@keyframes ccFadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ccPopIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes ccPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@keyframes ccSpin { to { transform: rotate(360deg); } }
+.cc-fade-up { animation: ccFadeUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.cc-pop-in { animation: ccPopIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Small gold spinner for in-progress states (payment opening, voice understanding) */
+.cc-spinner {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: 2px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
+  border-top-color: var(--color-primary);
+  animation: ccSpin 0.7s linear infinite;
+}
+
+/* Safe-area helpers for the mobile bottom nav / sticky cart (spec §15, §53) */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* ─── Sticky bottom anchors — safe-area aware (spec §9-10, §12) ─────────────
+   The cart/checkout bar floats above the mobile tab rail; the voice FAB clears
+   the bar by a comfortable gap when the cart is present and parks lower when the
+   cart is empty. env(safe-area-inset-bottom) adds breathing room for iOS home
+   indicators (Capacitor sets viewport-fit=cover in its native shell). */
+.bottom-anchor-cart {
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+}
+.bottom-anchor-voice {
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+}
+.bottom-anchor-voice-cart {
+  bottom: calc(184px + env(safe-area-inset-bottom, 0px));
+}
+/* Live-order status pill — parks above the voice FAB (and the cart bar) so a
+   ready/in-flight alert never covers the mic or checkout controls. */
+.bottom-anchor-pill {
+  bottom: calc(164px + env(safe-area-inset-bottom, 0px));
+}
+.bottom-anchor-pill-lift {
+  bottom: calc(252px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 768px) {
+  /* No bottom tab rail on md+: the cart bar drops to the corner, and the mic parks
+     clear of it (cart sits at 1.5rem with the corner pill ~70px tall ≈ top at 94px). */
+  .bottom-anchor-cart { bottom: 1.5rem; }
+  .bottom-anchor-voice, .bottom-anchor-voice-cart { bottom: 7rem; }
+  .bottom-anchor-pill, .bottom-anchor-pill-lift { bottom: 8rem; }
+}
+
+/* ─── Full-screen loading chassis (auth bootstrap + lazy-route suspense) ─────
+   A navy "plate" cycles food icons while the route streams in — visible progress
+   beats a dead spinner (loading states must give feedback). Navy/gold brand
+   tokens; reduced-motion users keep the message but lose the spin/pop. */
+.cc-loader-plate {
+  position: relative;
+  width: 7.5rem;
+  height: 7.5rem;
+  border-radius: 9999px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 30% 22%, #3A2C21, #1F1610 72%);
+  border: 1px solid rgba(224, 106, 59, 0.4);
+  box-shadow: 0 28px 70px -24px rgba(0, 0, 0, 0.75), inset 0 2px 0 rgba(255, 255, 255, 0.09), inset 0 -8px 18px rgba(0, 0, 0, 0.55);
+}
+.cc-loader-plate::before {
+  content: "";
+  position: absolute;
+  inset: -11px;
+  border-radius: 9999px;
+  border: 2px dashed rgba(224, 106, 59, 0.55);
+  animation: ccLoaderRingSpin 7s linear infinite;
+}
+.cc-loader-food {
+  font-size: 2.9rem;
+  line-height: 1;
+  animation: ccLoaderPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5));
+}
+.cc-loader-bar { width: 30%; height: 100%; border-radius: 9999px; background: var(--color-primary); animation: ccLoaderBar 1.4s ease-in-out infinite; }
+@keyframes ccLoaderRingSpin { to { transform: rotate(360deg); } }
+@keyframes ccLoaderPop {
+  0% { transform: scale(0.4) rotate(-14deg); opacity: 0; }
+  70% { transform: scale(1.14) rotate(5deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes ccLoaderBar {
+  0% { transform: translateX(-350%); }
+  100% { transform: translateX(350%); }
+}
+
+/* ─── Transient guard toast — drops in under the sticky header, auto-dismisses ── */
+@keyframes ccToastIn {
+  from { opacity: 0; transform: translate(-50%, -12px) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+.cc-toast { animation: ccToastIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
