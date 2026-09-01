@@ -1,0 +1,274 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // NOTE: this get() costs an extra document read per rule evaluation. Firebase Auth custom
+    // claims would be a more efficient way to encode role, but that requires a Cloud Function to
+    // set them — out of scope here; this is the standard Firestore-rules pattern in the meantime.
+    function myRole() {
+      return isSignedIn()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : null;
+    }
+
+    function isStaff() {
+      return myRole() == 'staff';
+    }
+
+    function isAdmin() {
+      return myRole() == 'admin';
+    }
+
+    function validStall(stall) {
+      return stall == null || stall in
+        ['Falcon Veg', 'Fresheteria', 'Mingos', 'Break Time', 'Surf & Turf', 'Bakery'];
+    }
+
+    function validOrderStatus(status) {
+      return status in ['pending', 'preparing', 'ready', 'completed'];
+    }
+
+    function onlyChanged(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // ── users ────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Client self-registration is student-only. Staff and admin roles are granted exclusively
+      // through the Admin SDK — api/verify-staff-verification-code.js (email-verified stall
+      // login), api/claim-admin-seat.js (first-login admin bootstrap), and api/admin-set-role.js
+      // (an existing admin promoting/reassigning someone) — all of which bypass these rules
+      // entirely, so a client can never write its own way into either role.
+      allow create: if isOwner(userId) && request.resource.data.role == 'student';
+
+      // A student may keep their own profile fields current but can never change their own role
+      // or stall. An admin may update anyone (role changes/reassignment from the panel still go
+      // through admin-set-role.js for server-side verification + cleanup, but the rule itself
+      // stays permissive for admins as defense-in-depth, not the primary path).
+      allow update: if (isOwner(userId)
+          && request.resource.data.role == resource.data.role
+          && validStall(request.resource.data.get('assignedStall', null)))
+        || isAdmin();
+
+      allow delete: if false;
+    }
+
+    // ── Public catalog / status data — anyone may read, only staff write ──
+    // Exception: any signed-in user may update ONLY a product's aggregate rating fields
+    // (tap-to-rate stars in UserMenu.rateMenuItem), with type/range validation so a client can
+    // never smuggle price/availability/name changes through this path.
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isStaff()
+        || (isSignedIn()
+          && onlyChanged(['rating', 'reviewCount'])
+          && request.resource.data.rating is number
+          && request.resource.data.rating >= 0
+          && request.resource.data.rating <= 5
+          && request.resource.data.reviewCount is number
+          && request.resource.data.reviewCount >= 0);
+    }
+
+    match /shop_status/{shopId} {
+      allow read: if true;
+      // Admin can override any stall's open/busy state directly from the panel, not just the
+      // staff member currently occupying it.
+      allow write: if isStaff() || isAdmin();
+    }
+
+    match /broadcasts/{broadcastId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    // ── Orders ────────────────────────────────────────────────────────────
+    // PAYMENT INVARIANT: an order becomes visible to the kitchen ONLY once its Razorpay payment
+    // has been verified server-side. The Admin SDK (canteen-backend /verify-payment, the
+    // webhook fallback) is the ONLY writer of payment_status == 'paid' — it bypasses these
+    // rules entirely; no client path can ever write that value.
+    //  - Staff reads are restricted to PAID orders, so unpaid/failed/cancelled checkouts can
+    //    never reach the Kitchen Live Board — enforced by the database, not by frontend JS.
+    //    Queries must include where('payment_status', '==', 'paid') to satisfy this rule.
+    //  - A student may park their own still-unpaid order as 'failed'/'cancelled' (e.g. closed
+    //    checkout or verification rejected) but can never set any other payment_status value.
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && (
+        resource.data.student_uid == request.auth.uid
+        || (isStaff() && resource.data.payment_status == 'paid'));
+
+      allow create: if isSignedIn()
+        && request.resource.data.student_uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.payment_status == 'pending'
+        // Payment-proof fields are introduced exclusively by the Admin SDK after signature
+        // verification — a client creating an order can never pre-seed them.
+        && !('razorpay_order_id' in request.resource.data)
+        && !('razorpay_payment_id' in request.resource.data)
+        && !('razorpay_signature' in request.resource.data)
+        && !('paid_at' in request.resource.data)
+        && !('payment_verified_by' in request.resource.data)
+        && !('amount_expected_paise' in request.resource.data);
+
+      allow update: if isSignedIn() && (
+        // Staff may advance status/phase-timestamps of PAID orders only, nothing else.
+        (isStaff()
+          && validOrderStatus(request.resource.data.status)
+          && resource.data.payment_status == 'paid'
+          && onlyChanged(['status', 'updatedAt', 'preparing_started_at', 'ready_at', 'completed_at']))
+        ||
+        // The order's own student may only self-report pickup: ready -> completed.
+        (resource.data.student_uid == request.auth.uid
+          && resource.data.status == 'ready'
+          && request.resource.data.status == 'completed'
+          && onlyChanged(['status', 'updatedAt', 'completed_at']))
+        ||
+        // The order's own student may record a FAILED/CANCELLED checkout attempt on their own
+        // still-pending, still-unpaid order (audit trail + retry UX). 'paid' is unreachable
+        // here by construction.
+        (resource.data.student_uid == request.auth.uid
+          && resource.data.status == 'pending'
+          && resource.data.payment_status == 'pending'
+          && request.resource.data.status == 'pending'
+          && request.resource.data.payment_status in ['failed', 'cancelled']
+          && onlyChanged(['payment_status', 'payment_note', 'updatedAt']))
+      );
+
+      allow delete: if isSignedIn() && resource.data.student_uid == request.auth.uid
+        && (resource.data.status == 'completed' || resource.data.payment_status != 'paid');
+    }
+
+    // ── Meal-pass subscriptions: same payment-integrity shape as orders ───
+    match /subscriptions/{subId} {
+      allow read: if isSignedIn() && (resource.data.student_uid == request.auth.uid || isStaff());
+
+      allow create: if isSignedIn()
+        && request.resource.data.student_uid == request.auth.uid
+        && request.resource.data.status == 'pending_payment'
+        && request.resource.data.get('payment_status', null) == 'pending'
+        && !('paid_at' in request.resource.data)
+        && !('payment_verified_by' in request.resource.data)
+        && !('activated_at' in request.resource.data);
+
+      allow update: if (isStaff()
+          && request.resource.data.get('payment_status', null) == resource.data.get('payment_status', null))
+        || (resource.data.student_uid == request.auth.uid
+          && resource.data.status == 'pending_payment'
+          && request.resource.data.status == 'pending_payment'
+          && request.resource.data.payment_status in ['failed', 'cancelled']
+          && onlyChanged(['payment_status']));
+
+      allow delete: if isSignedIn() && resource.data.student_uid == request.auth.uid
+        && (resource.data.status == 'pending_payment'
+            || resource.data.get('payment_status', null) in ['failed', 'cancelled']);
+    }
+
+    // ── Non-PII lifecycle mirror (shop_name/status/timestamps only) used for
+    // cross-student queue-depth and demand-forecast aggregates. Low sensitivity by design, so
+    // reads stay any-signed-in-user; but writes are scoped: a student may create/update/delete
+    // only their OWN signal, while staff may update any signal as they advance order statuses
+    // on their board. In practice the PRIMARY writer is now the Admin SDK's markDocumentPaid,
+    // which creates each signal at payment-verified time (unpaid checkouts never appear here);
+    // staff updates mirror kitchen status transitions.
+    match /order_signals/{orderId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.student_uid == request.auth.uid;
+      allow update: if isStaff()
+        || (isSignedIn() && resource.data.student_uid == request.auth.uid);
+      allow delete: if isSignedIn() && resource.data.student_uid == request.auth.uid;
+    }
+
+    // ── Research telemetry ─────────────────────────────────────────────────
+    // Research-grade interaction logs powering the manual-vs-voice studies. These collections
+    // never carry raw audio and guests are allowed to log so anonymous browsing/cart/voice flows
+    // stay measurable (the app's guest-browsing-first design depends on it). Fields are
+    // snake_case to match interaction_events and the SUS audit writer. NOTE: unauthenticated
+    // create is a spam vector on a research dataset — revisit with rate limiting / quota when the
+    // study grows beyond the current campus-scale user base.
+
+    // One document per executed command (manual, voice, or hybrid), written by whichever adapter
+    // produced the command. Owners may read their own trail (privacy transparency); analysis is
+    // staff/admin-only.
+    match /interaction_events/{eventId} {
+      allow read: if isStaff() || isAdmin()
+        || (isSignedIn() && resource.data.student_uid == request.auth.uid);
+
+      allow create: if (isSignedIn() && request.resource.data.student_uid == request.auth.uid)
+        || (request.auth == null && request.resource.data.student_uid == 'guest');
+
+      allow update, delete: if false;
+    }
+
+    // Per-task voice conversations (modality switches, steps, outcome). No writer yet — reserved
+    // for the Phase 2 session manager; the rule just guarantees it won't be blocked later.
+    match /voice_sessions/{sessionId} {
+      allow read: if isStaff() || isAdmin()
+        || (isSignedIn() && resource.data.student_uid == request.auth.uid);
+
+      allow create: if (isSignedIn() && request.resource.data.student_uid == request.auth.uid)
+        || (request.auth == null && request.resource.data.student_uid == 'guest');
+
+      allow update, delete: if false;
+    }
+
+    // STT/NLU failures (misrecognitions, no-match, ambiguous) — the fuel for alias + model
+    // iteration. Staff/admin read; any signed-in or guest user may contribute their own errors.
+    match /voice_errors/{errorId} {
+      allow read: if isStaff() || isAdmin();
+
+      allow create: if (isSignedIn() && request.resource.data.student_uid == request.auth.uid)
+        || (request.auth == null && request.resource.data.student_uid == 'guest');
+
+      allow update, delete: if false;
+    }
+
+    // Post-order UX audits: full SUS + TLX responses per modality, keyed to the ordering task.
+    match /ux_research_audits/{auditId} {
+      allow read: if isStaff() || isAdmin();
+
+      allow create: if (isSignedIn() && request.resource.data.student_uid == request.auth.uid)
+        || (request.auth == null && request.resource.data.student_uid == 'guest');
+
+      allow update, delete: if false;
+    }
+
+    // ── Stall occupancy lock (one active staff session per stall) ─────────
+    // Written by api/verify-staff-verification-code.js on login and deleted by
+    // api/admin-approve-logout.js on approval — both via the Admin SDK, bypassing these rules.
+    // The admin-only write here is defense-in-depth for the panel's "Force Release" action.
+    match /stall_sessions/{stallName} {
+      allow read: if isStaff() || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ── Staff logout requests: a staff member may only ever file a request about themselves;
+    // only an admin may see the queue or act on it (api/admin-approve-logout.js is the primary
+    // path — again, this rule is defense-in-depth, not the only gate).
+    // ── Stall ↔ email registry: which email is authorized to log into which stall. Admin-only
+    // in both directions — staff never read this directly; api/send-staff-verification-code.js
+    // and api/verify-staff-verification-code.js look it up via the Admin SDK, bypassing rules.
+    match /stall_email_registry/{stallName} {
+      allow read, write: if isAdmin();
+    }
+
+    match /logout_requests/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && request.resource.data.status == 'pending';
+      allow update: if isAdmin();
+      // Either side may clean up a resolved (non-pending) request once the staff member's own
+      // client has reacted to it (auto-signed-out on approval, or dismissed a denial).
+      allow delete: if isAdmin() || (isOwner(uid) && resource.data.status != 'pending');
+    }
+  }
+}

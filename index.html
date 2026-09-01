@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="mobile-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Brand typography: Google Fonts stand-ins for the Athelas + Vanguard pairing.
+         Vanguard → Outfit (professional geometric sans — all body/UI text); Athelas → Lora
+         (editorial serif — headings/display). Tempting (elegant script display accent) is
+         self-hosted via @font-face in src/index.css. -->
+    <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <title>Christ University Cafeteria | Yeshwantpur Campus</title>
+    
+    <script>
+      // Immediate execution to prevent white flash. Matches the dark palette in
+      // src/index.css so first paint never flashes between themes.
+      (function() {
+        const darkMode = localStorage.getItem('kitchenDarkMode') === 'true';
+        if (darkMode) {
+          document.documentElement.classList.add('dark');
+          document.documentElement.style.backgroundColor = '#0B0B0B';
+        } else {
+          document.documentElement.style.backgroundColor = '#FDF8F5';
+        }
+      })();
+    </script>
+
+    <style>
+      body {
+        margin: 0;
+        /* Matches the initial script to prevent flashes */
+        background-color: transparent; 
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      html {
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

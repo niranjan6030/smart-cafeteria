@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "canteen-backend/index.js", "use": "@vercel/node" },
+    { "src": "api/*.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/", "dest": "/canteen-backend/index.js" },
+    { "src": "/create-order", "dest": "/canteen-backend/index.js" },
+    { "src": "/verify-payment", "dest": "/canteen-backend/index.js" },
+    { "src": "/webhook", "dest": "/canteen-backend/index.js" },
+    { "src": "/staff-login", "dest": "/canteen-backend/index.js" },
+    { "src": "/send-staff-verification-code", "dest": "/canteen-backend/index.js" },
+    { "src": "/verify-staff-verification-code", "dest": "/canteen-backend/index.js" },
+    { "src": "/claim-admin-seat", "dest": "/canteen-backend/index.js" },
+    { "src": "/admin-set-role", "dest": "/canteen-backend/index.js" },
+    { "src": "/admin-approve-logout", "dest": "/canteen-backend/index.js" },
+    { "src": "/api/food-assistant(\\.js)?", "dest": "/api/food-assistant.js" }
+  ]
+}
